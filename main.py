@@ -1,4 +1,5 @@
 import socket
+import datetime
 
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 8080
@@ -14,19 +15,46 @@ print(f"Listening on port {SERVER_PORT} ...")
 
 while True:
     client_socket, client_address = server_socket.accept()
-    request = client_socket.recv(1500).decode()
+    request = client_socket.recv(1500).decode(encoding="utf")
     print(request)
     reqHeaders = request.split('\n')
     reqFirstLine = reqHeaders[0].split()
 
     httpMethod = reqFirstLine[0]
     reqPath = reqFirstLine[1]
+    httpVersion = reqFirstLine[2]
+    ifModifiedFlag = False;
 
-    if reqPath == '/test.html':
-        page = open('test.html')
-        content = page.read()
-        page.close()
+    modifiedSince = datetime.datetime(month=9,day=20,year=2026)  
+    modifiedSinceString = datetime.datetime.strftime(modifiedSince, ' %a, %d %b %Y %H:%M:%S GMT')
+    currentDate = datetime.datetime.strftime(datetime.datetime.now(), ' %a, %d %b %Y %H:%M:%S GMT')
 
-        response = 'HTTP/1.1 200 OK \n\n' + content
-        client_socket.sendall(response.encode())
-        client_socket.close()
+    for line in reqHeaders:
+        if "If-Modified-Since:" in line:
+            ifModifiedTimestamp = line.replace("If-Modified-Since:", "")
+            timestampDateTime = datetime.datetime.strptime(ifModifiedTimestamp, ' %a, %d %b %Y %H:%M:%S GMT\r') 
+
+            ifModifiedFlag = True         
+
+    if httpVersion != "HTTP/1.1":
+        response = 'HTTP/1.1 505 HTTP Version Not Supported \n\n'
+    elif httpMethod == "GET":
+        getResponseHeaders = 'Date:' + currentDate + '\nExpires: ' + modifiedSinceString + '\n' + 'Transfer-Encoding: chunked \n'
+
+        if ifModifiedFlag and (modifiedSince < timestampDateTime):
+            response = 'HTTP/1.1 304 Not Modified \n' + getResponseHeaders
+        elif reqPath == '/test.html':
+            page = open('test.html')
+            content = page.read()
+            page.close()
+
+            response = 'HTTP/1.1 200 OK \n' + '\n' + getResponseHeaders + content
+        else:
+            response = 'HTTP/1.1 404 Not Found \n\n'
+    else:
+        response = 'HTTP/1.1 405 Method Not Allowed \n\n'
+    client_socket.sendall(response.encode(encoding="utf"))
+    client_socket.close()
+
+
+
