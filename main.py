@@ -23,7 +23,12 @@ while True:
     httpMethod = reqFirstLine[0]
     reqPath = reqFirstLine[1]
     httpVersion = reqFirstLine[2]
-    ifModifiedFlag = False;
+    ifModifiedFlag = False
+    AuthFlag = False
+
+    password = ""
+    adminBearer = "admin123"
+    studentBearer = "student321"
 
     modifiedSince = datetime.datetime(month=9,day=20,year=2026)  
     modifiedSinceString = datetime.datetime.strftime(modifiedSince, ' %a, %d %b %Y %H:%M:%S GMT')
@@ -34,7 +39,11 @@ while True:
             ifModifiedTimestamp = line.replace("If-Modified-Since:", "")
             timestampDateTime = datetime.datetime.strptime(ifModifiedTimestamp, ' %a, %d %b %Y %H:%M:%S GMT\r') 
 
-            ifModifiedFlag = True         
+            ifModifiedFlag = True   
+        elif "Authentication: Bearer" in line:
+            password = line.replace("Authentication: Bearer ", "").strip()
+            AuthFlag = True
+
 
     if httpVersion != "HTTP/1.1":
         response = 'HTTP/1.1 505 HTTP Version Not Supported \n\n'
@@ -48,7 +57,18 @@ while True:
             content = page.read()
             page.close()
 
-            response = 'HTTP/1.1 200 OK \n' + '\n' + getResponseHeaders + content
+            response = 'HTTP/1.1 200 OK \n\n' + getResponseHeaders + content
+        elif reqPath == '/adminonly.html':
+            if AuthFlag and password == adminBearer:
+                page = open('adminonly.html')
+                content = page.read()
+                page.close()
+
+                response = 'HTTP/1.1 200 OK \n\n' + getResponseHeaders + content   
+            elif AuthFlag and password == studentBearer:
+                response = 'HTTP/1.1 403 Forbidden \n\n Date:' + currentDate + '\n'
+            else:
+                response = 'HTTP/1.1 404 Not Found \n\n'
         else:
             response = 'HTTP/1.1 404 Not Found \n\n'
     else:
